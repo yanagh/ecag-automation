@@ -78,7 +78,10 @@ export async function GET(
   });
 
   const buffer = await Packer.toBuffer(doc);
-  const body = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const body = buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength
+  );
 
   return new Response(body, {
     headers: {

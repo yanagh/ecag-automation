@@ -1,29 +1,43 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const router = useRouter();
   const supabase = createSupabaseBrowserClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    setMessage(null);
     setLoading(true);
 
-    const fn = mode === "login" ? supabase.auth.signInWithPassword : supabase.auth.signUp;
-    const { error } = await fn({ email, password });
-
-    if (error) {
-      setError(error.message);
+    if (mode === "login") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        router.push("/sources");
+      }
+    } else {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        setMessage("Check your email to confirm your account, then sign in.");
+        setLoading(false);
+      }
     }
-
-    setLoading(false);
   }
 
   return (
@@ -59,6 +73,11 @@ export default function LoginPage() {
           {error ? (
             <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
+            </div>
+          ) : null}
+          {message ? (
+            <div className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              {message}
             </div>
           ) : null}
           <button

@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isValidUrl } from "@/lib/validators";
 import { fetchRssItems } from "@/lib/rss";
 import { enqueueJob } from "@/lib/jobs";
+import { ProcessQueueButton } from "./ProcessQueueButton";
 
 async function getSources() {
   const supabase = createSupabaseServerClient();
@@ -177,11 +178,14 @@ export default async function SourcesPage() {
             Add RSS feeds or single URLs, then run processing on demand.
           </p>
         </div>
-        <form action={runAllActive}>
-          <button className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800">
-            Run all active
-          </button>
-        </form>
+        <div className="flex gap-2">
+          <form action={runAllActive}>
+            <button className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800">
+              Run all active
+            </button>
+          </form>
+          <ProcessQueueButton />
+        </div>
       </div>
 
       <div className="rounded border bg-white p-4">

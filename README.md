@@ -80,3 +80,4 @@ To use a URL param, update the cron path in `vercel.json` after deployment:
 ## Notes
 - The LLM is constrained to return strict JSON only.
 - Dedupe is by URL unless you click **Re-run** on an article.
+- Deployment test: this line can be removed after the first Vercel build.

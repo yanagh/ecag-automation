@@ -78,10 +78,7 @@ export async function GET(
   });
 
   const buffer = await Packer.toBuffer(doc);
-  const body = buffer.buffer.slice(
-    buffer.byteOffset,
-    buffer.byteOffset + buffer.byteLength
-  );
+  const body = new Blob([buffer]);
 
   return new Response(body, {
     headers: {

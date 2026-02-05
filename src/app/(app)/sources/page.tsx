@@ -124,17 +124,21 @@ async function addSource(formData: FormData) {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) {
+    console.error("addSource: No user found");
+    return;
+  }
 
   const url = String(formData.get("url") ?? "").trim();
   const label = String(formData.get("label") ?? "").trim();
   const type = String(formData.get("type") ?? "rss");
 
   if (!isValidUrl(url)) {
+    console.error("addSource: Invalid URL", url);
     return;
   }
 
-  await supabase.from("sources")
+  const { error } = await supabase.from("sources")
     .insert({
       user_id: user.id,
       url,
@@ -142,6 +146,11 @@ async function addSource(formData: FormData) {
       type,
       is_active: true
     });
+
+  if (error) {
+    console.error("addSource: Insert error", error.message);
+    return;
+  }
 
   revalidatePath("/sources");
 }
@@ -194,7 +203,7 @@ export default async function SourcesPage() {
             <option value="url">Single URL</option>
           </select>
           <div className="md:col-span-4">
-            <button className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800">
+            <button type="submit" className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800">
               Add source
             </button>
           </div>

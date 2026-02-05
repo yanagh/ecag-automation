@@ -46,19 +46,27 @@ export default async function ArticlesPage() {
             key={article.id}
             className="rounded border bg-white p-4 hover:border-slate-400"
           >
+            {(() => {
+              const source = Array.isArray(article.sources)
+                ? article.sources[0]
+                : article.sources;
+              const sourceLabel = source?.label || source?.url || article.url;
+              return (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <Link href={`/articles/${article.id}`} className="font-medium hover:underline">
                   {article.title_en || article.title_ge || "Untitled"}
                 </Link>
                 <div className="text-xs text-slate-500">
-                  {article.sources?.label || article.sources?.url || article.url}
+                  {sourceLabel}
                 </div>
               </div>
               <div className="text-xs text-slate-500">
                 {new Date(article.created_at).toLocaleString()}
               </div>
             </div>
+              );
+            })()}
             <div className="mt-2 flex items-center justify-between gap-3 text-sm text-slate-600">
               <span>Status: {article.status}</span>
               <form action={rerunArticle.bind(null, article.id, article.url)}>

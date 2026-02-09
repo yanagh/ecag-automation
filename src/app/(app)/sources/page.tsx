@@ -3,8 +3,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isValidUrl } from "@/lib/validators";
 import { fetchRssItems } from "@/lib/rss";
 import { enqueueJob } from "@/lib/jobs";
-import { ProcessQueueButton } from "./ProcessQueueButton";
 import { SubmitButton } from "@/components/SubmitButton";
+import { RunSourceButton } from "@/components/RunSourceButton";
 
 async function getSources() {
   const supabase = createSupabaseServerClient();
@@ -182,6 +182,13 @@ async function toggleActive(sourceId: string, isActive: boolean) {
   revalidatePath("/sources");
 }
 
+async function deleteSource(sourceId: string) {
+  "use server";
+  const supabase = createSupabaseServerClient();
+  await supabase.from("sources").delete().eq("id", sourceId);
+  revalidatePath("/sources");
+}
+
 export default async function SourcesPage() {
   const sources = await getSources();
 
@@ -195,15 +202,11 @@ export default async function SourcesPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <form action={runAllActive}>
-            <SubmitButton
-              pendingText="Running all..."
-              className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
-            >
-              Run all active
-            </SubmitButton>
-          </form>
-          <ProcessQueueButton />
+          <RunSourceButton
+            runAction={runAllActive}
+            label="Run all active"
+            className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+          />
         </div>
       </div>
 
@@ -248,14 +251,11 @@ export default async function SourcesPage() {
               <div className="text-xs text-slate-500">{source.url}</div>
             </div>
             <div className="flex items-center gap-3">
-              <form action={runSource.bind(null, source.id)}>
-                <SubmitButton
-                  pendingText="Running..."
-                  className="rounded border px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Run
-                </SubmitButton>
-              </form>
+              <RunSourceButton
+                runAction={runSource.bind(null, source.id)}
+                label="Run"
+                className="rounded border px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+              />
               <form action={toggleActive.bind(null, source.id, !source.is_active)}>
                 <button
                   className={`rounded px-3 py-1 text-sm ${
@@ -266,6 +266,14 @@ export default async function SourcesPage() {
                 >
                   {source.is_active ? "Active" : "Inactive"}
                 </button>
+              </form>
+              <form action={deleteSource.bind(null, source.id)}>
+                <SubmitButton
+                  pendingText="Deleting..."
+                  className="rounded border border-red-200 px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Delete
+                </SubmitButton>
               </form>
             </div>
           </div>

@@ -47,7 +47,7 @@ Follow ALL rules:
 
 Output requirements:
 - title_en: short headline in English.
-- brief_en: 5–7 sentences.
+- brief_en: 5–6 sentences.
 - article_en: Rewrite the article in English based ONLY on provided text. If the extracted article is too long, shorten it while preserving key facts. Keep total length roughly 350–600 words. Use section titles as plain text lines (no Markdown symbols). Separate paragraphs by a blank line. Include a "Key takeaways" section with lines starting "- ".
 - title_ge, brief_ge, article_ge: Georgian translations of the English fields.
 - source_url: must match the provided URL exactly.

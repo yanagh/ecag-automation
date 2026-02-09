@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { enqueueJob } from "@/lib/jobs";
@@ -32,6 +33,21 @@ async function rerunArticle(id: string, url: string) {
   revalidatePath("/articles");
 }
 
+async function deleteArticle(id: string) {
+  "use server";
+  const supabase = createSupabaseServerClient();
+  await supabase.from("articles").delete().eq("id", id);
+  redirect("/articles");
+}
+
+async function toggleUsed(id: string, isUsed: boolean) {
+  "use server";
+  const supabase = createSupabaseServerClient();
+  await supabase.from("articles").update({ is_used: isUsed }).eq("id", id);
+  revalidatePath(`/articles/${id}`);
+  revalidatePath("/articles");
+}
+
 export default async function ArticleDetail({
   params
 }: {
@@ -53,9 +69,16 @@ export default async function ArticleDetail({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">
-            {article.title_en || article.title_ge || "Untitled"}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold">
+              {article.title_en || article.title_ge || "Untitled"}
+            </h1>
+            {article.is_used && (
+              <span className="rounded bg-slate-200 px-2 py-0.5 text-sm text-slate-600">
+                Used
+              </span>
+            )}
+          </div>
           <div className="text-sm text-slate-600">
             {article.sources?.label || article.sources?.url || article.url}
           </div>
@@ -67,8 +90,19 @@ export default async function ArticleDetail({
           ) : null}
         </div>
         <div className="flex flex-col gap-2">
+          <form action={toggleUsed.bind(null, article.id, !article.is_used)}>
+            <button
+              className={`w-full rounded border px-3 py-1 text-sm ${
+                article.is_used
+                  ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                  : "hover:bg-slate-50"
+              }`}
+            >
+              {article.is_used ? "Unmark used" : "Mark as used"}
+            </button>
+          </form>
           <form action={rerunArticle.bind(null, article.id, article.url)}>
-            <button className="rounded border px-3 py-1 text-sm hover:bg-slate-50">
+            <button className="w-full rounded border px-3 py-1 text-sm hover:bg-slate-50">
               Re-run
             </button>
           </form>
@@ -84,6 +118,11 @@ export default async function ArticleDetail({
           >
             Download .md
           </Link>
+          <form action={deleteArticle.bind(null, article.id)}>
+            <button className="w-full rounded border border-red-200 px-3 py-1 text-sm text-red-600 hover:bg-red-50">
+              Delete
+            </button>
+          </form>
         </div>
       </div>
 

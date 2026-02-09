@@ -68,7 +68,7 @@ async function runSource(sourceId: string) {
   if (!source) return;
 
   if (source.type === "rss") {
-    const items = await fetchRssItems(source.url, 5);
+    const items = await fetchRssItems(source.url, 2);
     const urls = items.map((item) => item.link).filter(Boolean);
     const existing = await getExistingArticleUrls(user.id, urls);
 

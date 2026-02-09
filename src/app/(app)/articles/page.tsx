@@ -7,7 +7,7 @@ async function getArticles() {
   const supabase = createSupabaseServerClient();
   const { data } = await supabase
     .from("articles")
-    .select("id, url, title_en, title_ge, status, created_at, sources(label, url)")
+    .select("id, url, title_en, title_ge, status, is_used, created_at, sources(label, url)")
     .order("created_at", { ascending: false });
   return data ?? [];
 }
@@ -30,6 +30,20 @@ async function rerunArticle(id: string, url: string) {
   revalidatePath("/articles");
 }
 
+async function deleteArticle(id: string) {
+  "use server";
+  const supabase = createSupabaseServerClient();
+  await supabase.from("articles").delete().eq("id", id);
+  revalidatePath("/articles");
+}
+
+async function toggleUsed(id: string, isUsed: boolean) {
+  "use server";
+  const supabase = createSupabaseServerClient();
+  await supabase.from("articles").update({ is_used: isUsed }).eq("id", id);
+  revalidatePath("/articles");
+}
+
 export default async function ArticlesPage() {
   const articles = await getArticles();
 
@@ -44,7 +58,9 @@ export default async function ArticlesPage() {
         {articles.map((article) => (
           <div
             key={article.id}
-            className="rounded border bg-white p-4 hover:border-slate-400"
+            className={`rounded border bg-white p-4 hover:border-slate-400 ${
+              article.is_used ? "opacity-60" : ""
+            }`}
           >
             {(() => {
               const source = Array.isArray(article.sources)
@@ -54,9 +70,16 @@ export default async function ArticlesPage() {
               return (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <Link href={`/articles/${article.id}`} className="font-medium hover:underline">
-                  {article.title_en || article.title_ge || "Untitled"}
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link href={`/articles/${article.id}`} className="font-medium hover:underline">
+                    {article.title_en || article.title_ge || "Untitled"}
+                  </Link>
+                  {article.is_used && (
+                    <span className="rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-600">
+                      Used
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-slate-500">
                   {sourceLabel}
                 </div>
@@ -69,11 +92,29 @@ export default async function ArticlesPage() {
             })()}
             <div className="mt-2 flex items-center justify-between gap-3 text-sm text-slate-600">
               <span>Status: {article.status}</span>
-              <form action={rerunArticle.bind(null, article.id, article.url)}>
-                <button className="rounded border px-3 py-1 text-sm hover:bg-slate-50">
-                  Re-run
-                </button>
-              </form>
+              <div className="flex items-center gap-2">
+                <form action={toggleUsed.bind(null, article.id, !article.is_used)}>
+                  <button
+                    className={`rounded border px-3 py-1 text-sm ${
+                      article.is_used
+                        ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                        : "hover:bg-slate-50"
+                    }`}
+                  >
+                    {article.is_used ? "Unmark used" : "Mark used"}
+                  </button>
+                </form>
+                <form action={rerunArticle.bind(null, article.id, article.url)}>
+                  <button className="rounded border px-3 py-1 text-sm hover:bg-slate-50">
+                    Re-run
+                  </button>
+                </form>
+                <form action={deleteArticle.bind(null, article.id)}>
+                  <button className="rounded border border-red-200 px-3 py-1 text-sm text-red-600 hover:bg-red-50">
+                    Delete
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
         ))}

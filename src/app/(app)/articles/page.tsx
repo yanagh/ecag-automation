@@ -2,6 +2,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { enqueueJob } from "@/lib/jobs";
+import { SubmitButton } from "@/components/SubmitButton";
 
 async function getArticles() {
   const supabase = createSupabaseServerClient();
@@ -94,25 +95,31 @@ export default async function ArticlesPage() {
               <span>Status: {article.status}</span>
               <div className="flex items-center gap-2">
                 <form action={toggleUsed.bind(null, article.id, !article.is_used)}>
-                  <button
-                    className={`rounded border px-3 py-1 text-sm ${
+                  <SubmitButton
+                    className={`rounded border px-3 py-1 text-sm disabled:opacity-50 ${
                       article.is_used
                         ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
                         : "hover:bg-slate-50"
                     }`}
                   >
                     {article.is_used ? "Unmark used" : "Mark used"}
-                  </button>
+                  </SubmitButton>
                 </form>
                 <form action={rerunArticle.bind(null, article.id, article.url)}>
-                  <button className="rounded border px-3 py-1 text-sm hover:bg-slate-50">
+                  <SubmitButton
+                    pendingText="Running..."
+                    className="rounded border px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+                  >
                     Re-run
-                  </button>
+                  </SubmitButton>
                 </form>
                 <form action={deleteArticle.bind(null, article.id)}>
-                  <button className="rounded border border-red-200 px-3 py-1 text-sm text-red-600 hover:bg-red-50">
+                  <SubmitButton
+                    pendingText="Deleting..."
+                    className="rounded border border-red-200 px-3 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
                     Delete
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             </div>

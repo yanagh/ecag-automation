@@ -4,6 +4,7 @@ import { isValidUrl } from "@/lib/validators";
 import { fetchRssItems } from "@/lib/rss";
 import { enqueueJob } from "@/lib/jobs";
 import { ProcessQueueButton } from "./ProcessQueueButton";
+import { SubmitButton } from "@/components/SubmitButton";
 
 async function getSources() {
   const supabase = createSupabaseServerClient();
@@ -58,20 +59,30 @@ async function runSource(sourceId: string) {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) {
+    console.error("runSource: No authenticated user");
+    return;
+  }
 
   const { data: source } = await supabase
     .from("sources")
     .select("*")
     .eq("id", sourceId)
     .single();
-  if (!source) return;
+  if (!source) {
+    console.error("runSource: Source not found", sourceId);
+    return;
+  }
+
+  console.log(`runSource: Running source "${source.label || source.url}" (${source.type})`);
 
   if (source.type === "rss") {
     const items = await fetchRssItems(source.url, 2);
+    console.log(`runSource: Fetched ${items.length} RSS items`);
     const urls = items.map((item) => item.link).filter(Boolean);
     const existing = await getExistingArticleUrls(user.id, urls);
 
+    let queued = 0;
     for (const url of urls) {
       if (existing.has(url)) continue;
       const articleId = await createQueuedArticle({
@@ -80,7 +91,9 @@ async function runSource(sourceId: string) {
         url
       });
       await enqueueJob(user.id, "process_url", { article_id: articleId, url });
+      queued++;
     }
+    console.log(`runSource: Queued ${queued} new articles (${existing.size} already existed)`);
   } else {
     const url = source.url;
     const existing = await getExistingArticleUrls(user.id, [url]);
@@ -91,6 +104,9 @@ async function runSource(sourceId: string) {
         url
       });
       await enqueueJob(user.id, "process_url", { article_id: articleId, url });
+      console.log("runSource: Queued 1 article");
+    } else {
+      console.log("runSource: Article already exists, skipped");
     }
   }
 
@@ -180,9 +196,12 @@ export default async function SourcesPage() {
         </div>
         <div className="flex gap-2">
           <form action={runAllActive}>
-            <button className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800">
+            <SubmitButton
+              pendingText="Running all..."
+              className="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+            >
               Run all active
-            </button>
+            </SubmitButton>
           </form>
           <ProcessQueueButton />
         </div>
@@ -207,9 +226,12 @@ export default async function SourcesPage() {
             <option value="url">Single URL</option>
           </select>
           <div className="md:col-span-4">
-            <button type="submit" className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800">
+            <SubmitButton
+              pendingText="Adding..."
+              className="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+            >
               Add source
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>
@@ -227,9 +249,12 @@ export default async function SourcesPage() {
             </div>
             <div className="flex items-center gap-3">
               <form action={runSource.bind(null, source.id)}>
-                <button className="rounded border px-3 py-1 text-sm hover:bg-slate-50">
+                <SubmitButton
+                  pendingText="Running..."
+                  className="rounded border px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+                >
                   Run
-                </button>
+                </SubmitButton>
               </form>
               <form action={toggleActive.bind(null, source.id, !source.is_active)}>
                 <button

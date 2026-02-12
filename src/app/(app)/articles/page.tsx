@@ -4,14 +4,29 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { enqueueJob } from "@/lib/jobs";
 import { SubmitButton } from "@/components/SubmitButton";
 
-async function getArticles() {
+async function getArticles(): Promise<{ articles: Article[]; error: string | null }> {
   const supabase = createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("articles")
     .select("id, url, title_en, title_ge, status, is_used, created_at, sources(label, url)")
     .order("created_at", { ascending: false });
-  return data ?? [];
+  if (error) {
+    console.error("getArticles error:", error.message);
+    return { articles: [], error: error.message };
+  }
+  return { articles: data ?? [], error: null };
 }
+
+type Article = {
+  id: string;
+  url: string;
+  title_en: string | null;
+  title_ge: string | null;
+  status: string;
+  is_used: boolean;
+  created_at: string;
+  sources: { label: string | null; url: string } | { label: string | null; url: string }[] | null;
+};
 
 async function rerunArticle(id: string, url: string) {
   "use server";
@@ -46,7 +61,7 @@ async function toggleUsed(id: string, isUsed: boolean) {
 }
 
 export default async function ArticlesPage() {
-  const articles = await getArticles();
+  const { articles, error: queryError } = await getArticles();
 
   return (
     <div className="space-y-6">
@@ -54,6 +69,12 @@ export default async function ArticlesPage() {
         <h1 className="text-2xl font-semibold">Articles</h1>
         <p className="text-sm text-slate-600">Processed items and status.</p>
       </div>
+
+      {queryError && (
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Database query error: {queryError}
+        </div>
+      )}
 
       <div className="space-y-3">
         {articles.map((article) => (

@@ -21,7 +21,11 @@ async function fetchHtml(url: string) {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const secret = request.headers.get("x-worker-secret") || url.searchParams.get("secret");
-  if (!secret || secret !== process.env.WORKER_SECRET) {
+  const cronSecret = request.headers.get("authorization")?.replace("Bearer ", "");
+  const isAuthorized =
+    (secret && secret === process.env.WORKER_SECRET) ||
+    (cronSecret && process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET);
+  if (!isAuthorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

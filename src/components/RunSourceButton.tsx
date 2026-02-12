@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+type RunResult = { error?: string; queued: number; skipped: number };
+
 export function RunSourceButton({
   runAction,
   label = "Run",
   className = "rounded border px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
 }: {
-  runAction: () => Promise<void>;
+  runAction: () => Promise<RunResult>;
   label?: string;
   className?: string;
 }) {
@@ -21,15 +23,34 @@ export function RunSourceButton({
     setStatus("Queuing articles...");
 
     try {
-      await runAction();
+      const result = await runAction();
 
-      setStatus("Processing queue...");
+      if (result.error) {
+        setStatus(`Error: ${result.error}`);
+        setLoading(false);
+        setTimeout(() => setStatus(null), 8000);
+        router.refresh();
+        return;
+      }
+
+      if (result.queued === 0) {
+        const msg = result.skipped > 0
+          ? `No new articles (${result.skipped} already exist)`
+          : "No articles found in feed";
+        setStatus(msg);
+        setLoading(false);
+        setTimeout(() => setStatus(null), 5000);
+        router.refresh();
+        return;
+      }
+
+      setStatus(`Processing ${result.queued} article(s)...`);
       const res = await fetch(`/api/worker?secret=${process.env.NEXT_PUBLIC_WORKER_SECRET}`);
       const data = await res.json();
 
       if (res.ok) {
         const count = data.processed ?? 0;
-        setStatus(count > 0 ? `Done! ${count} processed` : "No new articles to process");
+        setStatus(count > 0 ? `Done! ${count} processed` : "Queued for processing");
       } else {
         setStatus(`Error: ${data.error || "Worker failed"}`);
       }

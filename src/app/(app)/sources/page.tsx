@@ -53,7 +53,7 @@ async function createQueuedArticle({
   return data.id as string;
 }
 
-async function runSource(sourceId: string) {
+async function runSource(sourceId: string): Promise<{ error?: string; queued: number; skipped: number }> {
   "use server";
   const supabase = createSupabaseServerClient();
   const {
@@ -61,7 +61,7 @@ async function runSource(sourceId: string) {
   } = await supabase.auth.getUser();
   if (!user) {
     console.error("runSource: No authenticated user");
-    return;
+    return { error: "Not authenticated", queued: 0, skipped: 0 };
   }
 
   const { data: source } = await supabase
@@ -71,68 +71,109 @@ async function runSource(sourceId: string) {
     .single();
   if (!source) {
     console.error("runSource: Source not found", sourceId);
-    return;
+    return { error: "Source not found", queued: 0, skipped: 0 };
   }
 
   console.log(`runSource: Running source "${source.label || source.url}" (${source.type})`);
 
-  if (source.type === "rss") {
-    const items = await fetchRssItems(source.url, 2);
-    console.log(`runSource: Fetched ${items.length} RSS items`);
-    const urls = items.map((item) => item.link).filter(Boolean);
-    const existing = await getExistingArticleUrls(user.id, urls);
+  try {
+    if (source.type === "rss") {
+      let items;
+      try {
+        items = await fetchRssItems(source.url, 2);
+      } catch (rssError) {
+        const msg = rssError instanceof Error ? rssError.message : "Unknown RSS error";
+        console.error(`runSource: Failed to fetch/parse RSS feed "${source.url}":`, msg);
+        return { error: `Failed to parse RSS feed: ${msg}`, queued: 0, skipped: 0 };
+      }
 
-    let queued = 0;
-    for (const url of urls) {
-      if (existing.has(url)) continue;
-      const articleId = await createQueuedArticle({
-        userId: user.id,
-        sourceId: source.id,
-        url
-      });
-      await enqueueJob(user.id, "process_url", { article_id: articleId, url });
-      queued++;
-    }
-    console.log(`runSource: Queued ${queued} new articles (${existing.size} already existed)`);
-  } else {
-    const url = source.url;
-    const existing = await getExistingArticleUrls(user.id, [url]);
-    if (!existing.has(url)) {
-      const articleId = await createQueuedArticle({
-        userId: user.id,
-        sourceId: source.id,
-        url
-      });
-      await enqueueJob(user.id, "process_url", { article_id: articleId, url });
-      console.log("runSource: Queued 1 article");
+      console.log(`runSource: Fetched ${items.length} RSS items`);
+      if (items.length === 0) {
+        return { error: "RSS feed returned no items", queued: 0, skipped: 0 };
+      }
+
+      const urls = items.map((item) => item.link).filter(Boolean);
+      const existing = await getExistingArticleUrls(user.id, urls);
+
+      let queued = 0;
+      for (const url of urls) {
+        if (existing.has(url)) continue;
+        const articleId = await createQueuedArticle({
+          userId: user.id,
+          sourceId: source.id,
+          url
+        });
+        await enqueueJob(user.id, "process_url", { article_id: articleId, url });
+        queued++;
+      }
+      const skipped = existing.size;
+      console.log(`runSource: Queued ${queued} new articles (${skipped} already existed)`);
+      revalidatePath("/sources");
+      revalidatePath("/articles");
+      return { queued, skipped };
     } else {
-      console.log("runSource: Article already exists, skipped");
+      const url = source.url;
+      const existing = await getExistingArticleUrls(user.id, [url]);
+      if (!existing.has(url)) {
+        const articleId = await createQueuedArticle({
+          userId: user.id,
+          sourceId: source.id,
+          url
+        });
+        await enqueueJob(user.id, "process_url", { article_id: articleId, url });
+        console.log("runSource: Queued 1 article");
+        revalidatePath("/sources");
+        revalidatePath("/articles");
+        return { queued: 1, skipped: 0 };
+      } else {
+        console.log("runSource: Article already exists, skipped");
+        revalidatePath("/sources");
+        revalidatePath("/articles");
+        return { queued: 0, skipped: 1 };
+      }
     }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error(`runSource: Unexpected error for source "${source.url}":`, msg);
+    revalidatePath("/sources");
+    revalidatePath("/articles");
+    return { error: msg, queued: 0, skipped: 0 };
   }
-
-  revalidatePath("/sources");
-  revalidatePath("/articles");
 }
 
-async function runAllActive() {
+async function runAllActive(): Promise<{ error?: string; queued: number; skipped: number }> {
   "use server";
   const supabase = createSupabaseServerClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return { error: "Not authenticated", queued: 0, skipped: 0 };
 
   const { data: sources } = await supabase
     .from("sources")
     .select("*")
     .eq("is_active", true);
 
+  let totalQueued = 0;
+  let totalSkipped = 0;
+  const errors: string[] = [];
+
   for (const source of sources ?? []) {
-    await runSource(source.id);
+    const result = await runSource(source.id);
+    totalQueued += result.queued;
+    totalSkipped += result.skipped;
+    if (result.error) {
+      errors.push(`${source.label || source.url}: ${result.error}`);
+    }
   }
 
   revalidatePath("/sources");
   revalidatePath("/articles");
+  return {
+    queued: totalQueued,
+    skipped: totalSkipped,
+    error: errors.length > 0 ? errors.join("; ") : undefined
+  };
 }
 
 async function addSource(formData: FormData) {
